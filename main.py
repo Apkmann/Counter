@@ -1,7 +1,6 @@
 import streamlit as st
 import datetime
 import time
-import math
 
 # Page configuration
 st.set_page_config(
@@ -10,6 +9,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Initialize session state
+if 'last_update' not in st.session_state:
+    st.session_state.last_update = datetime.datetime.now()
 
 # Custom CSS for stunning visuals
 st.markdown("""
@@ -210,15 +213,6 @@ st.markdown("""
         min-height: 100vh;
     }
     
-    .tips-container {
-        background: rgba(255,255,255,0.1);
-        border-radius: 15px;
-        padding: 1.5rem;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.2);
-        margin: 2rem 0;
-    }
-    
     .blinking {
         animation: blink 1s infinite;
     }
@@ -226,6 +220,19 @@ st.markdown("""
     @keyframes blink {
         0%, 50% { opacity: 1; }
         51%, 100% { opacity: 0; }
+    }
+    
+    .refresh-indicator {
+        position: fixed;
+        top: 10px;
+        right: 20px;
+        background: rgba(255,255,255,0.1);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        backdrop-filter: blur(10px);
+        z-index: 1000;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -236,7 +243,7 @@ def calculate_countdown():
     exam_date = datetime.datetime(2025, 7, 12, 9, 0, 0)  # Assuming 9 AM exam time
     
     if now > exam_date:
-        return None, "Exam day has passed!"
+        return None, "🎉 Exam day has arrived! Best of luck!"
     
     time_remaining = exam_date - now
     
@@ -288,27 +295,11 @@ def get_motivational_message(days_remaining):
     else:
         return "💪 Victory is near! Stay calm, trust your preparation, and maintain confidence!"
 
-def get_study_tips():
-    """Return study tips based on time remaining"""
-    return """
-    **🎯 Strategic Study Plan:**
-    - **Daily Target**: 6-8 hours focused study + 2 hours revision
-    - **Mock Tests**: Attempt 2-3 full-length tests per week
-    - **Current Affairs**: 1 hour daily newspaper + monthly magazine
-    - **Previous Papers**: Solve last 10 years question papers
-    - **Weak Areas**: Dedicate extra 2 hours to challenging topics
-    - **Health**: 7-8 hours sleep + regular exercise + healthy diet
-    
-    **📊 Subject-wise Time Allocation:**
-    - General Studies: 40%
-    - Aptitude & Mental Ability: 25%
-    - General Tamil/English: 20%
-    - Current Affairs: 15%
-    """
-
-# Main app
 def main():
-    # Header with animation
+    # Add refresh indicator
+    st.markdown(f'<div class="refresh-indicator">🔄 Last updated: {datetime.datetime.now().strftime("%H:%M:%S")}</div>', unsafe_allow_html=True)
+    
+    # Header
     st.markdown('<h1 class="main-header">🎓 TNPSC GROUP 4 COUNTDOWN</h1>', unsafe_allow_html=True)
     
     # Exam info
@@ -321,101 +312,114 @@ def main():
     </div>
     ''', unsafe_allow_html=True)
     
-    # Create containers for real-time updates
-    countdown_placeholder = st.empty()
-    progress_placeholder = st.empty()
-    stats_placeholder = st.empty()
-    motivation_placeholder = st.empty()
+    # Calculate countdown
+    time_data, error_msg = calculate_countdown()
     
-    # Auto-refresh loop
-    for _ in range(86400):  # Run for 24 hours, then restart
-        time_data, error_msg = calculate_countdown()
+    if error_msg:
+        st.success(error_msg)
+        st.balloons()
+        return
+    
+    # Countdown Display
+    blink_class = "blinking" if time_data['days'] <= 7 else ""
+    st.markdown(f'''
+    <div class="countdown-container">
+        <div class="time-unit {blink_class}">
+            <span class="time-number">{time_data['days']:02d}</span>
+            <div class="time-label">DAYS</div>
+        </div>
+        <div class="time-unit">
+            <span class="time-number">{time_data['hours']:02d}</span>
+            <div class="time-label">HOURS</div>
+        </div>
+        <div class="time-unit">
+            <span class="time-number">{time_data['minutes']:02d}</span>
+            <div class="time-label">MINUTES</div>
+        </div>
+        <div class="time-unit">
+            <span class="time-number">{time_data['seconds']:02d}</span>
+            <div class="time-label">SECONDS</div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+    
+    # Progress Bar
+    st.markdown(create_progress_bar(time_data), unsafe_allow_html=True)
+    
+    # Statistics
+    total_hours = time_data['total_seconds'] / 3600
+    study_hours_per_day = 6
+    total_study_hours = time_data['days'] * study_hours_per_day
+    mock_tests = max(time_data['days'] // 3, 1)
+    
+    st.markdown(f'''
+    <div class="stats-container">
+        <div class="stat-card">
+            <div class="stat-number">{total_hours:.0f}</div>
+            <div class="stat-label">⏰ Total Hours Left</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{total_study_hours:.0f}</div>
+            <div class="stat-label">📚 Study Hours Available</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{mock_tests}</div>
+            <div class="stat-label">🎯 Mock Tests Possible</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{time_data['days'] * 2}</div>
+            <div class="stat-label">📖 Revision Sessions</div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+    
+    # Motivational Section
+    message = get_motivational_message(time_data['days'])
+    st.markdown(f'<div class="motivational-text">✨ {message}</div>', unsafe_allow_html=True)
+    
+    # Study Strategy
+    with st.expander("💡 Master Study Strategy & Tips", expanded=False):
+        st.markdown("""
+        **🎯 Strategic Study Plan:**
+        - **Daily Target**: 6-8 hours focused study + 2 hours revision
+        - **Mock Tests**: Attempt 2-3 full-length tests per week
+        - **Current Affairs**: 1 hour daily newspaper + monthly magazine
+        - **Previous Papers**: Solve last 10 years question papers
+        - **Weak Areas**: Dedicate extra 2 hours to challenging topics
+        - **Health**: 7-8 hours sleep + regular exercise + healthy diet
         
-        if error_msg:
-            st.error(f"🎉 {error_msg}")
+        **📊 Subject-wise Time Allocation:**
+        - General Studies: 40%
+        - Aptitude & Mental Ability: 25%
+        - General Tamil/English: 20%
+        - Current Affairs: 15%
+        """)
+    
+    # Interactive Buttons (Outside the loop, using unique keys)
+    st.markdown("### 🚀 Quick Actions")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🎯 Set Today's Goal", key="goal_btn", use_container_width=True):
+            st.success("✅ Great! Set your daily study target and stay focused!")
+    
+    with col2:
+        if st.button("📊 Take Mock Test", key="mock_btn", use_container_width=True):
+            st.info("🚀 Excellent! Time to test your knowledge and track progress.")
+    
+    with col3:
+        if st.button("💪 Get Motivated", key="motivate_btn", use_container_width=True):
             st.balloons()
-            break
-        
-        # Countdown Display
-        with countdown_placeholder.container():
-            blink_class = "blinking" if time_data['days'] <= 7 else ""
-            st.markdown(f'''
-            <div class="countdown-container">
-                <div class="time-unit {blink_class}">
-                    <span class="time-number">{time_data['days']:02d}</span>
-                    <div class="time-label">DAYS</div>
-                </div>
-                <div class="time-unit">
-                    <span class="time-number">{time_data['hours']:02d}</span>
-                    <div class="time-label">HOURS</div>
-                </div>
-                <div class="time-unit">
-                    <span class="time-number">{time_data['minutes']:02d}</span>
-                    <div class="time-label">MINUTES</div>
-                </div>
-                <div class="time-unit">
-                    <span class="time-number">{time_data['seconds']:02d}</span>
-                    <div class="time-label">SECONDS</div>
-                </div>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        # Progress Bar
-        with progress_placeholder.container():
-            st.markdown(create_progress_bar(time_data), unsafe_allow_html=True)
-        
-        # Statistics
-        with stats_placeholder.container():
-            total_hours = time_data['total_seconds'] / 3600
-            study_hours_per_day = 6
-            total_study_hours = time_data['days'] * study_hours_per_day
-            mock_tests = max(time_data['days'] // 3, 1)
-            
-            st.markdown(f'''
-            <div class="stats-container">
-                <div class="stat-card">
-                    <div class="stat-number">{total_hours:.0f}</div>
-                    <div class="stat-label">⏰ Total Hours Left</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{total_study_hours:.0f}</div>
-                    <div class="stat-label">📚 Study Hours Available</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{mock_tests}</div>
-                    <div class="stat-label">🎯 Mock Tests Possible</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{time_data['days'] * 2}</div>
-                    <div class="stat-label">📖 Revision Sessions</div>
-                </div>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        # Motivational Section
-        with motivation_placeholder.container():
-            message = get_motivational_message(time_data['days'])
-            st.markdown(f'<div class="motivational-text">✨ {message}</div>', unsafe_allow_html=True)
-            
-            # Study Tips in expandable section
-            with st.expander("💡 Master Study Strategy & Tips", expanded=False):
-                st.markdown(get_study_tips())
-            
-            # Quick actions
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("🎯 Today's Goal", use_container_width=True):
-                    st.success("✅ Set your daily target and track progress!")
-            with col2:
-                if st.button("📊 Mock Test", use_container_width=True):
-                    st.info("🚀 Time for a practice test! Test your knowledge.")
-            with col3:
-                if st.button("💪 Motivation", use_container_width=True):
-                    st.balloons()
-                    st.success("🌟 You've got this! Keep pushing forward!")
-        
-        # Wait for 1 second before next update
-        time.sleep(1)
+            st.success("🌟 You're doing amazing! Every day brings you closer to success!")
+    
+    # Auto-refresh setup
+    st.markdown("""
+    <script>
+        setTimeout(function(){
+            window.location.reload();
+        }, 1000);
+    </script>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
