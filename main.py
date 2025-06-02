@@ -1,9 +1,7 @@
 import streamlit as st
 import datetime
 import time
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import numpy as np
+import math
 
 # Page configuration
 st.set_page_config(
@@ -16,27 +14,36 @@ st.set_page_config(
 # Custom CSS for stunning visuals
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+    
     .main-header {
         text-align: center;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 3.5rem;
-        font-weight: bold;
+        font-weight: 900;
         margin-bottom: 2rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        font-family: 'Orbitron', monospace;
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    
+    @keyframes glow {
+        from { text-shadow: 0 0 10px #667eea, 0 0 20px #667eea, 0 0 30px #667eea; }
+        to { text-shadow: 0 0 20px #764ba2, 0 0 30px #764ba2, 0 0 40px #764ba2; }
     }
     
     .exam-info {
         text-align: center;
         font-size: 1.5rem;
-        color: #4a5568;
+        color: #ffffff;
         margin-bottom: 3rem;
-        padding: 1rem;
+        padding: 2rem;
         background: rgba(255,255,255,0.1);
-        border-radius: 15px;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 20px;
+        backdrop-filter: blur(15px);
+        border: 2px solid rgba(255,255,255,0.2);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }
     
     .countdown-container {
@@ -48,58 +55,177 @@ st.markdown("""
     }
     
     .time-unit {
-        background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        background: linear-gradient(145deg, #ff6b6b, #ee5a24, #ff9ff3);
         color: white;
-        padding: 2rem;
-        border-radius: 20px;
+        padding: 2.5rem 1.5rem;
+        border-radius: 25px;
         text-align: center;
-        min-width: 150px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        transform: perspective(1000px) rotateX(5deg);
-        transition: all 0.3s ease;
+        min-width: 160px;
+        box-shadow: 
+            0 15px 35px rgba(0,0,0,0.4),
+            inset 0 -5px 15px rgba(0,0,0,0.2);
+        transform: perspective(1000px) rotateX(10deg);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .time-unit::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+        transform: rotate(45deg);
+        animation: shine 3s infinite;
+    }
+    
+    @keyframes shine {
+        0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+        50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        100% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
     }
     
     .time-unit:hover {
-        transform: perspective(1000px) rotateX(0deg) translateY(-10px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        transform: perspective(1000px) rotateX(0deg) translateY(-15px) scale(1.05);
+        box-shadow: 
+            0 25px 50px rgba(0,0,0,0.5),
+            inset 0 -5px 15px rgba(0,0,0,0.2);
     }
     
     .time-number {
-        font-size: 3rem;
-        font-weight: bold;
+        font-size: 3.5rem;
+        font-weight: 900;
         display: block;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        font-family: 'Orbitron', monospace;
+        text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        position: relative;
+        z-index: 2;
     }
     
     .time-label {
         font-size: 1.2rem;
-        margin-top: 0.5rem;
-        opacity: 0.9;
+        margin-top: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+        position: relative;
+        z-index: 2;
+    }
+    
+    .progress-bar-container {
+        margin: 3rem 0;
+        padding: 2rem;
+        background: rgba(255,255,255,0.1);
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 30px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 15px;
+        overflow: hidden;
+        position: relative;
+        margin: 1rem 0;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ff6b6b, #ffa726, #66bb6a);
+        border-radius: 15px;
+        transition: width 0.5s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .progress-fill::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        animation: progress-shine 2s infinite;
+    }
+    
+    @keyframes progress-shine {
+        0% { left: -100%; }
+        100% { left: 100%; }
     }
     
     .motivational-text {
         text-align: center;
-        font-size: 1.3rem;
-        color: #2d3748;
+        font-size: 1.4rem;
+        color: #ffffff;
         margin: 3rem 0;
-        padding: 2rem;
-        background: linear-gradient(135deg, #ffeef8, #f0fff4);
-        border-radius: 15px;
-        border-left: 5px solid #38a169;
+        padding: 2.5rem;
+        background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(108,92,231,0.2));
+        border-radius: 20px;
+        border: 2px solid rgba(255,255,255,0.2);
+        backdrop-filter: blur(15px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }
     
-    .progress-container {
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
         margin: 2rem 0;
     }
     
-    body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
+    .stat-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #ffa726;
+        font-family: 'Orbitron', monospace;
+    }
+    
+    .stat-label {
+        font-size: 1rem;
+        color: #ffffff;
+        margin-top: 0.5rem;
     }
     
     .stApp {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
         min-height: 100vh;
+    }
+    
+    .tips-container {
+        background: rgba(255,255,255,0.1);
+        border-radius: 15px;
+        padding: 1.5rem;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        margin: 2rem 0;
+    }
+    
+    .blinking {
+        animation: blink 1s infinite;
+    }
+    
+    @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -126,92 +252,96 @@ def calculate_countdown():
         'total_seconds': time_remaining.total_seconds()
     }, None
 
-def create_progress_chart(time_data):
-    """Create a beautiful progress visualization"""
+def create_progress_bar(time_data):
+    """Create a beautiful progress bar"""
     total_days = 40  # Total days from June 2 to July 12
     remaining_days = time_data['days']
     completed_days = total_days - remaining_days
+    progress_percentage = (completed_days / total_days) * 100
     
-    # Create a circular progress chart
-    fig = go.Figure(data=[
-        go.Pie(
-            values=[completed_days, remaining_days],
-            labels=['Days Completed', 'Days Remaining'],
-            hole=0.7,
-            marker_colors=['#38a169', '#e53e3e'],
-            textinfo='none',
-            hovertemplate='%{label}: %{value} days<extra></extra>'
-        )
-    ])
-    
-    fig.update_layout(
-        title={
-            'text': f"Progress: {completed_days}/{total_days} Days",
-            'x': 0.5,
-            'font': {'size': 20, 'color': 'white'}
-        },
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font={'color': 'white'},
-        height=300
-    )
-    
-    # Add center text
-    fig.add_annotation(
-        text=f"{(completed_days/total_days)*100:.1f}%<br>Complete",
-        x=0.5, y=0.5,
-        font_size=20,
-        font_color="white",
-        showarrow=False
-    )
-    
-    return fig
+    return f"""
+    <div class="progress-bar-container">
+        <h3 style="color: white; text-align: center; margin-bottom: 1rem;">
+            📈 Preparation Progress: {progress_percentage:.1f}%
+        </h3>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {progress_percentage}%;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; color: white; font-size: 0.9rem; margin-top: 0.5rem;">
+            <span>Start: June 2</span>
+            <span>{completed_days}/{total_days} days</span>
+            <span>Exam: July 12</span>
+        </div>
+    </div>
+    """
 
 def get_motivational_message(days_remaining):
     """Get motivational message based on days remaining"""
     if days_remaining > 30:
-        return "🎯 You have plenty of time! Create a solid study plan and stick to it."
+        return "🎯 Excellent! You have abundant time. Create a comprehensive study plan and build strong fundamentals!"
     elif days_remaining > 20:
-        return "📚 Great! You're in the perfect preparation zone. Focus on your weak areas."
+        return "📚 Perfect timing! You're in the golden preparation zone. Focus on covering all topics systematically."
     elif days_remaining > 10:
-        return "⚡ Time to intensify! Practice more mock tests and revise thoroughly."
+        return "⚡ Acceleration time! Increase your practice sessions and solve more mock tests."
     elif days_remaining > 5:
-        return "🔥 Final sprint mode! Review important topics and stay confident."
+        return "🔥 Final sprint activated! Focus on revision, important formulas, and quick recall techniques."
     else:
-        return "💪 You're almost there! Stay calm, revise key points, and believe in yourself!"
+        return "💪 Victory is near! Stay calm, trust your preparation, and maintain confidence!"
+
+def get_study_tips():
+    """Return study tips based on time remaining"""
+    return """
+    **🎯 Strategic Study Plan:**
+    - **Daily Target**: 6-8 hours focused study + 2 hours revision
+    - **Mock Tests**: Attempt 2-3 full-length tests per week
+    - **Current Affairs**: 1 hour daily newspaper + monthly magazine
+    - **Previous Papers**: Solve last 10 years question papers
+    - **Weak Areas**: Dedicate extra 2 hours to challenging topics
+    - **Health**: 7-8 hours sleep + regular exercise + healthy diet
+    
+    **📊 Subject-wise Time Allocation:**
+    - General Studies: 40%
+    - Aptitude & Mental Ability: 25%
+    - General Tamil/English: 20%
+    - Current Affairs: 15%
+    """
 
 # Main app
 def main():
-    # Header
-    st.markdown('<h1 class="main-header">🎓 TNPSC Group 4 Exam Countdown</h1>', unsafe_allow_html=True)
+    # Header with animation
+    st.markdown('<h1 class="main-header">🎓 TNPSC GROUP 4 COUNTDOWN</h1>', unsafe_allow_html=True)
     
     # Exam info
     st.markdown('''
     <div class="exam-info">
-        📅 <strong>Exam Date:</strong> July 12, 2025<br>
+        📅 <strong>TARGET DATE:</strong> July 12, 2025 | 🕘 9:00 AM<br>
         🏛️ <strong>Tamil Nadu Public Service Commission</strong><br>
-        📍 <strong>Group 4 (Combined Civil Services Examination)</strong>
+        📍 <strong>Group 4 - Combined Civil Services Examination</strong><br>
+        🎯 <strong>Your Success Journey Starts Now!</strong>
     </div>
     ''', unsafe_allow_html=True)
     
-    # Create a placeholder for auto-refresh
+    # Create containers for real-time updates
     countdown_placeholder = st.empty()
     progress_placeholder = st.empty()
+    stats_placeholder = st.empty()
     motivation_placeholder = st.empty()
     
-    # Auto-refresh every second
-    while True:
+    # Auto-refresh loop
+    for _ in range(86400):  # Run for 24 hours, then restart
         time_data, error_msg = calculate_countdown()
         
         if error_msg:
-            countdown_placeholder.error(error_msg)
+            st.error(f"🎉 {error_msg}")
+            st.balloons()
             break
         
+        # Countdown Display
         with countdown_placeholder.container():
-            # Countdown display
+            blink_class = "blinking" if time_data['days'] <= 7 else ""
             st.markdown(f'''
             <div class="countdown-container">
-                <div class="time-unit">
+                <div class="time-unit {blink_class}">
                     <span class="time-number">{time_data['days']:02d}</span>
                     <div class="time-label">DAYS</div>
                 </div>
@@ -230,40 +360,59 @@ def main():
             </div>
             ''', unsafe_allow_html=True)
         
+        # Progress Bar
         with progress_placeholder.container():
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                # Progress chart
-                fig = create_progress_chart(time_data)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                # Study statistics
-                st.markdown("### 📊 Study Stats")
-                total_hours = time_data['total_seconds'] / 3600
-                study_hours_per_day = 6  # Assuming 6 hours study per day
-                total_study_hours = time_data['days'] * study_hours_per_day
-                
-                st.metric("⏰ Total Hours Left", f"{total_hours:.0f}")
-                st.metric("📚 Potential Study Hours", f"{total_study_hours:.0f}")
-                st.metric("🎯 Study Sessions Left", f"{total_study_hours//2:.0f}")
+            st.markdown(create_progress_bar(time_data), unsafe_allow_html=True)
         
-        with motivation_placeholder.container():
-            # Motivational message
-            message = get_motivational_message(time_data['days'])
-            st.markdown(f'<div class="motivational-text">{message}</div>', unsafe_allow_html=True)
+        # Statistics
+        with stats_placeholder.container():
+            total_hours = time_data['total_seconds'] / 3600
+            study_hours_per_day = 6
+            total_study_hours = time_data['days'] * study_hours_per_day
+            mock_tests = max(time_data['days'] // 3, 1)
             
-            # Study tips
-            with st.expander("💡 Quick Study Tips"):
-                st.markdown("""
-                - **Daily Schedule**: Maintain 6-8 hours of focused study
-                - **Mock Tests**: Take at least one mock test every 3 days
-                - **Revision**: Dedicate 2 hours daily for revision
-                - **Current Affairs**: Read newspapers and monthly magazines
-                - **Previous Papers**: Solve last 5 years' question papers
-                - **Health**: Take breaks, exercise, and maintain good sleep
-                """)
+            st.markdown(f'''
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-number">{total_hours:.0f}</div>
+                    <div class="stat-label">⏰ Total Hours Left</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{total_study_hours:.0f}</div>
+                    <div class="stat-label">📚 Study Hours Available</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{mock_tests}</div>
+                    <div class="stat-label">🎯 Mock Tests Possible</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{time_data['days'] * 2}</div>
+                    <div class="stat-label">📖 Revision Sessions</div>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        # Motivational Section
+        with motivation_placeholder.container():
+            message = get_motivational_message(time_data['days'])
+            st.markdown(f'<div class="motivational-text">✨ {message}</div>', unsafe_allow_html=True)
+            
+            # Study Tips in expandable section
+            with st.expander("💡 Master Study Strategy & Tips", expanded=False):
+                st.markdown(get_study_tips())
+            
+            # Quick actions
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("🎯 Today's Goal", use_container_width=True):
+                    st.success("✅ Set your daily target and track progress!")
+            with col2:
+                if st.button("📊 Mock Test", use_container_width=True):
+                    st.info("🚀 Time for a practice test! Test your knowledge.")
+            with col3:
+                if st.button("💪 Motivation", use_container_width=True):
+                    st.balloons()
+                    st.success("🌟 You've got this! Keep pushing forward!")
         
         # Wait for 1 second before next update
         time.sleep(1)
